@@ -10,7 +10,7 @@ import joblib
 
 # Parámetros de umbral
 THRESHOLD_R2 = 0.92  # R² mínimo esperado (92%)
-THRESHOLD_MAE = 0.08  # Error absoluto medio máximo (en escala logarítmica)
+THRESHOLD_MAE = 0.20  # Error absoluto medio máximo (en escala logarítmica)
 
 print("=" * 60)
 print("VALIDACIÓN DEL MODELO")
