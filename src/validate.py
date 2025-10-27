@@ -7,6 +7,7 @@ from sklearn.preprocessing import LabelEncoder
 import seaborn as sns
 import sys
 import os
+import joblib
 
 # Parámetro de umbral (ajustado para el dataset de diamonds)
 THRESHOLD_R2 = 0.80  # R² mínimo esperado (80%)
