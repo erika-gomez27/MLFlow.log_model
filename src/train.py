@@ -69,7 +69,7 @@ if experiment_id is None:
 print("\n=== PARTE 1: CARGA DE DATOS ===")
 print("--- Cargando dataset 'diamonds' desde Seaborn ---")
 
-# Cargar dataset (NO es de sklearn.datasets)
+# Cargar dataset
 df = sns.load_dataset('diamonds')
 print(f"✅ Dataset cargado exitosamente. Shape: {df.shape}")
 print(f"Columnas: {list(df.columns)}")
@@ -151,39 +151,47 @@ print("\n=== PARTE 4: EVALUACIÓN DEL MODELO ===")
 y_train_pred_log = model.predict(X_train)
 y_test_pred_log = model.predict(X_test)
 
-# Revertir transformación logarítmica
+# Calcular métricas en escala LOGARÍTMICA
+train_mse_log = mean_squared_error(y_train_log, y_train_pred_log)
+test_mse_log = mean_squared_error(y_test_log, y_test_pred_log)
+train_mae_log = mean_absolute_error(y_train_log, y_train_pred_log)
+test_mae_log = mean_absolute_error(y_test_log, y_test_pred_log)
+train_r2_log = r2_score(y_train_log, y_train_pred_log)
+test_r2_log = r2_score(y_test_log, y_test_pred_log)
+
+# Revertir transformación logarítmica para análisis en escala original
 y_train_pred = np.expm1(y_train_pred_log)
 y_test_pred = np.expm1(y_test_pred_log)
 y_train_original = np.expm1(y_train_log)
 y_test_original = np.expm1(y_test_log)
 
-# Calcular métricas en escala logarítmica
-train_mse_log = mean_squared_error(y_train_log, y_train_pred_log)
-test_mse_log = mean_squared_error(y_test_log, y_test_pred_log)
-train_r2_log = r2_score(y_train_log, y_train_pred_log)
-test_r2_log = r2_score(y_test_log, y_test_pred_log)
+# Calcular métricas en escala ORIGINAL (USD)
+train_mse_original = mean_squared_error(y_train_original, y_train_pred)
+test_mse_original = mean_squared_error(y_test_original, y_test_pred)
+train_mae_original = mean_absolute_error(y_train_original, y_train_pred)
+test_mae_original = mean_absolute_error(y_test_original, y_test_pred)
+train_r2_original = r2_score(y_train_original, y_train_pred)
+test_r2_original = r2_score(y_test_original, y_test_pred)
 
-# Calcular métricas en escala original
-train_mse = mean_squared_error(y_train_original, y_train_pred)
-test_mse = mean_squared_error(y_test_original, y_test_pred)
-train_mae = mean_absolute_error(y_train_original, y_train_pred)
-test_mae = mean_absolute_error(y_test_original, y_test_pred)
-train_r2 = r2_score(y_train_original, y_train_pred)
-test_r2 = r2_score(y_test_original, y_test_pred)
+print("\n" + "="*60)
+print("📊 MÉTRICAS DEL MODELO")
+print("="*60)
+print(f"\nEscala Logarítmica:")
+print(f"  Train MSE (log): {train_mse_log:.4f}")
+print(f"  Test MSE (log):  {test_mse_log:.4f}")
+print(f"  Train MAE (log): {train_mae_log:.4f}")
+print(f"  Test MAE (log):  {test_mae_log:.4f}")
+print(f"  Train R² (log):  {train_r2_log:.4f}")
+print(f"  Test R² (log):   {test_r2_log:.4f}")
 
-print("\n--- Métricas en Escala Logarítmica ---")
-print(f"Train MSE (log): {train_mse_log:.4f}")
-print(f"Test MSE (log):  {test_mse_log:.4f}")
-print(f"Train R² (log):  {train_r2_log:.4f}")
-print(f"Test R² (log):   {test_r2_log:.4f}")
-
-print("\n--- Métricas en Escala Original (USD) ---")
-print(f"Train MSE: ${train_mse:,.2f}")
-print(f"Test MSE:  ${test_mse:,.2f}")
-print(f"Train MAE: ${train_mae:,.2f}")
-print(f"Test MAE:  ${test_mae:,.2f}")
-print(f"Train R²:  {train_r2:.4f}")
-print(f"Test R²:   {test_r2:.4f}")
+print(f"\nEscala Original (USD):")
+print(f"  Train MSE: ${train_mse_original:,.2f}")
+print(f"  Test MSE:  ${test_mse_original:,.2f}")
+print(f"  Train MAE: ${train_mae_original:,.2f}")
+print(f"  Test MAE:  ${test_mae_original:,.2f}")
+print(f"  Train R²:  {train_r2_original:.4f}")
+print(f"  Test R²:   {test_r2_original:.4f}")
+print("="*60)
 
 # ========================================
 # PARTE 5: TRACKING CON MLFLOW
@@ -217,14 +225,23 @@ try:
         mlflow.log_param("n_features", len(feature_cols))
         mlflow.log_param("features", str(feature_cols))
         
-        # REGISTRAR MÉTRICAS (al menos 2 como pide la guía)
+        # REGISTRAR MÉTRICAS - Ambas escalas
         print("--- Registrando métricas ---")
+        # Escala logarítmica
+        mlflow.log_metric("train_mse_log", train_mse_log)
         mlflow.log_metric("test_mse_log", test_mse_log)
+        mlflow.log_metric("train_mae_log", train_mae_log)
+        mlflow.log_metric("test_mae_log", test_mae_log)
+        mlflow.log_metric("train_r2_log", train_r2_log)
         mlflow.log_metric("test_r2_log", test_r2_log)
-        mlflow.log_metric("test_mse_original", test_mse)
-        mlflow.log_metric("test_mae_original", test_mae)
-        mlflow.log_metric("test_r2_original", test_r2)
-        mlflow.log_metric("train_r2_original", train_r2)
+        
+        # Escala original (USD)
+        mlflow.log_metric("train_mse_original", train_mse_original)
+        mlflow.log_metric("test_mse_original", test_mse_original)
+        mlflow.log_metric("train_mae_original", train_mae_original)
+        mlflow.log_metric("test_mae_original", test_mae_original)
+        mlflow.log_metric("train_r2_original", train_r2_original)
+        mlflow.log_metric("test_r2_original", test_r2_original)
         
         # REGISTRAR MODELO CON FIRMA Y EJEMPLO
         print("--- Registrando modelo con firma y ejemplo de entrada ---")
@@ -265,14 +282,20 @@ try:
                 f.write(f"{key}: {value}\n")
         print(f"✅ Información de transformación guardada en: {transform_path}")
         
-        # Guardar métricas en archivo para CI/CD
+        # ✅ CORRECCIÓN CRÍTICA: Guardar métricas en escala ORIGINAL (USD) para validación
         metrics_path = os.path.join(workspace_dir, "metrics.txt")
         with open(metrics_path, 'w') as f:
-            f.write(f"Test MSE (original): ${test_mse:,.2f}\n")
-            f.write(f"Test MAE (original): ${test_mae:,.2f}\n")
-            f.write(f"Test R² (original): {test_r2:.4f}\n")
-            f.write(f"Test MSE (log): {test_mse_log:.4f}\n")
-            f.write(f"Test R² (log): {test_r2_log:.4f}\n")
+            # Métricas principales en escala ORIGINAL (USD) - PARA VALIDACIÓN
+            f.write(f"test_mse: {test_mse_original:.4f}\n")
+            f.write(f"test_mae: {test_mae_original:.4f}\n")
+            f.write(f"test_r2: {test_r2_original:.4f}\n")
+            f.write(f"train_r2: {train_r2_original:.4f}\n")
+            
+            # Métricas adicionales (escala logarítmica - solo informativas)
+            f.write(f"\n# Métricas en escala logarítmica - Solo informativo\n")
+            f.write(f"test_mse_log: {test_mse_log:.4f}\n")
+            f.write(f"test_mae_log: {test_mae_log:.4f}\n")
+            f.write(f"test_r2_log: {test_r2_log:.4f}\n")
         print(f"✅ Métricas guardadas en: {metrics_path}")
 
         print("\n" + "="*60)
@@ -280,8 +303,10 @@ try:
         print("="*60)
         print(f"📊 Dataset: Diamonds (Seaborn)")
         print(f"📈 Modelo: LinearRegression con transformación logarítmica")
-        print(f"🎯 Métrica principal: R² = {test_r2:.4f}")
-        print(f"💰 Error medio absoluto: ${test_mae:,.2f}")
+        print(f"🎯 Métrica principal (USD): R² = {test_r2_original:.4f}")
+        print(f"💰 Error medio absoluto (USD): ${test_mae_original:,.2f}")
+        print(f"📈 R² en escala log: {test_r2_log:.4f}")
+        print(f"💰 MAE en escala log: {test_mae_log:.4f}")
         print(f"🔗 MLflow Run ID: {run_id}")
         print("="*60)
 

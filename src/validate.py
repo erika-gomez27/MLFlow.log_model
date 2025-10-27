@@ -1,4 +1,3 @@
-#import joblib
 import pandas as pd
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -9,9 +8,9 @@ import sys
 import os
 import joblib
 
-# Parámetro de umbral (ajustado para el dataset de diamonds)
-THRESHOLD_R2 = 0.9200  # R² mínimo esperado (92%)
-THRESHOLD_MAE = 0.0814  # Error absoluto medio máximo en USD
+# Parámetros de umbral
+THRESHOLD_R2 = 0.92  # R² mínimo esperado (92%)
+THRESHOLD_MAE = 0.08  # Error absoluto medio máximo (en escala logarítmica)
 
 print("=" * 60)
 print("VALIDACIÓN DEL MODELO")
@@ -39,6 +38,135 @@ print(f"✅ Dataset después de limpieza. Shape: {df.shape}")
 # 3. Codificación de variables categóricas
 categorical_cols = ['cut', 'color', 'clarity']
 label_encoders = {}
+
+for col in categorical_cols:
+    le = LabelEncoder()
+    df[col + '_encoded'] = le.fit_transform(df[col])
+    label_encoders[col] = le
+
+# 4. Seleccionar features y target (IGUAL que en train.py)
+feature_cols = ['carat', 'cut_encoded', 'color_encoded', 'clarity_encoded', 
+                'depth', 'table', 'x', 'y', 'z']
+X = df[feature_cols].values
+y = df['price'].values
+
+# 5. Aplicar transformación logarítmica (IGUAL que en train.py)
+y_log = np.log1p(y)
+
+# 6. División de datos (MISMOS parámetros que en train.py)
+X_train, X_test, y_train_log, y_test_log = train_test_split(
+    X, y_log, test_size=0.2, random_state=42
+)
+print(f"✅ Train set: {X_train.shape[0]} muestras")
+print(f"✅ Test set: {X_test.shape[0]} muestras")
+
+# --- Cargar el modelo entrenado ---
+print("\n--- Cargando modelo entrenado ---")
+model_path = "model.pkl"
+
+if not os.path.exists(model_path):
+    print(f"❌ ERROR: No se encontró el archivo del modelo en '{model_path}'")
+    sys.exit(1)
+
+try:
+    model = joblib.load(model_path)
+    print(f"✅ Modelo cargado exitosamente desde '{model_path}'")
+except Exception as e:
+    print(f"❌ ERROR al cargar el modelo: {e}")
+    sys.exit(1)
+
+# --- Realizar predicciones ---
+print("\n--- Realizando predicciones ---")
+try:
+    # Predicciones en escala logarítmica
+    y_test_pred_log = model.predict(X_test)
+    print(f"✅ Predicciones realizadas exitosamente")
+    print(f"   Shape de predicciones: {y_test_pred_log.shape}")
+    print(f"   Rango de predicciones (log): [{y_test_pred_log.min():.4f}, {y_test_pred_log.max():.4f}]")
+except Exception as e:
+    print(f"❌ ERROR al realizar predicciones: {e}")
+    sys.exit(1)
+
+# --- Calcular métricas en ESCALA LOGARÍTMICA ---
+print("\n--- Calculando métricas en escala logarítmica ---")
+test_mse_log = mean_squared_error(y_test_log, y_test_pred_log)
+test_mae_log = mean_absolute_error(y_test_log, y_test_pred_log)
+test_r2_log = r2_score(y_test_log, y_test_pred_log)
+
+print(f"  MSE (log): {test_mse_log:.4f}")
+print(f"  MAE (log): {test_mae_log:.4f}")
+print(f"  R² (log):  {test_r2_log:.4f}")
+
+# --- Calcular métricas en ESCALA ORIGINAL (USD) ---
+print("\n--- Calculando métricas en escala original (USD) ---")
+
+# Revertir transformación logarítmica
+y_test_pred = np.expm1(y_test_pred_log)
+y_test_original = np.expm1(y_test_log)
+
+test_mse_original = mean_squared_error(y_test_original, y_test_pred)
+test_mae_original = mean_absolute_error(y_test_original, y_test_pred)
+test_r2_original = r2_score(y_test_original, y_test_pred)
+
+print(f"  MSE: ${test_mse_original:,.2f}")
+print(f"  MAE: ${test_mae_original:,.2f}")
+print(f"  R²:  {test_r2_original:.4f}")
+
+# --- Mostrar resumen de métricas ---
+print("\n" + "=" * 60)
+print("📊 RESUMEN DE MÉTRICAS DEL MODELO")
+print("=" * 60)
+print(f"\nEscala Logarítmica:")
+print(f"  R² (log): {test_r2_log:.4f}")
+print(f"  MAE (log): {test_mae_log:.4f}")
+
+print(f"\nEscala Original (USD):")
+print(f"  R²: {test_r2_original:.4f}")
+print(f"  MAE: ${test_mae_original:,.2f}")
+print("=" * 60)
+
+# --- Validar contra umbrales ---
+print("\n--- Validando contra umbrales de calidad ---")
+print(f"Umbral R² mínimo: {THRESHOLD_R2}")
+print(f"Umbral MAE máximo: ${THRESHOLD_MAE}")
+
+validation_passed = True
+error_messages = []
+
+# Validar R² en escala logarítmica
+if test_r2_log < THRESHOLD_R2:
+    validation_passed = False
+    error_messages.append(f"R² ({test_r2_log:.4f}) es menor que el umbral ({THRESHOLD_R2})")
+    print(f"  ❌ R² ({test_r2_log:.4f}) es menor que el umbral ({THRESHOLD_R2})")
+else:
+    print(f"  ✅ R² ({test_r2_log:.4f}) supera el umbral ({THRESHOLD_R2})")
+
+# Validar MAE en escala logarítmica
+if test_mae_log > THRESHOLD_MAE:
+    validation_passed = False
+    error_messages.append(f"MAE ({test_mae_log:.4f}) excede el umbral (${THRESHOLD_MAE})")
+    print(f"  ❌ MAE ({test_mae_log:.4f}) excede el umbral (${THRESHOLD_MAE})")
+else:
+    print(f"  ✅ MAE ({test_mae_log:.4f}) está dentro del umbral (${THRESHOLD_MAE})")
+
+# --- Resultado final ---
+print("\n" + "=" * 60)
+if validation_passed:
+    print("✅ VALIDACIÓN EXITOSA")
+    print("=" * 60)
+    print("El modelo cumple con los criterios de calidad:")
+    print(f"  • R² (log): {test_r2_log:.4f} >= {THRESHOLD_R2}")
+    print(f"  • MAE (log): {test_mae_log:.4f} <= ${THRESHOLD_MAE}")
+    print("=" * 60)
+    sys.exit(0)
+else:
+    print("❌ VALIDACIÓN FALLIDA")
+    print("=" * 60)
+    print("El modelo no cumple los criterios de calidad:")
+    for msg in error_messages:
+        print(f"  • {msg}")
+    print("=" * 60)
+    sys.exit(1)
 
 for col in categorical_cols:
     le = LabelEncoder()
